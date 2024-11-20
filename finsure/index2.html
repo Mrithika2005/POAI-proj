@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retirement Scenario Comparison</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <style>
+        body {
+            background-color: black;
+            color: #21d952;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            width: 90%;
+            margin: 0 auto;
+        }
+        h1, h2 {
+            text-align: center;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .input-group {
+            background-color: #333;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        input[type="number"], input[type="submit"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            background-color: #1a1a1a;
+            border: 1px solid #21d952;
+            color: #21d952;
+            border-radius: 4px;
+        }
+        input[type="submit"] {
+            background-color: #21d952;
+            color: black;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        input[type="submit"]:hover {
+            background-color: #1ab442;
+        }
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .chart-box {
+            background-color: #333;
+            padding: 20px;
+            border-radius: 5px;
+            height: 400px;
+        }
+        .scenario-comparison {
+            background-color: #333;
+            padding: 20px;
+            margin-top: 20px;
+            border-radius: 5px;
+        }
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .comparison-card {
+            background-color: #1a1a1a;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #21d952;
+        }
+        .scenario-title {
+            color: #21d952;
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .metric {
+            margin: 10px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+        @media (max-width: 768px) {
+            .charts-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Retirement Scenario Comparison</h1>
+        
+        <form id="scenario-inputs">
+            <div class="form-grid">
+                <div class="input-group">
+                    <label for="income">Yearly Income (INR):</label>
+                    <input type="number" id="income" required>
+                    
+                    <label for="expenses">Monthly Expenses (INR):</label>
+                    <input type="number" id="expenses" required>
+                </div>
+
+                <div class="input-group">
+                    <label for="assets">Current Assets (INR):</label>
+                    <input type="number" id="assets" required>
+                    
+                    <label for="age">Current Age:</label>
+                    <input type="number" id="age" required>
+                </div>
+
+                <div class="input-group">
+                    <label for="retirement-age">Target Retirement Age:</label>
+                    <input type="number" id="retirement-age" value="60" required>
+                    
+                    <label for="savings-rate">Current Savings Rate (%):</label>
+                    <input type="number" id="savings-rate" value="20" required>
+                </div>
+            </div>
+            <input type="submit" value="Compare Scenarios">
+        </form>
+
+        <div class="charts-container">
+            <div class="chart-box">
+                <canvas id="retirement-comparison"></canvas>
+            </div>
+            <div class="chart-box">
+                <canvas id="monthly-income"></canvas>
+            </div>
+            <div class="chart-box">
+                <canvas id="risk-return"></canvas>
+            </div>
+            <div class="chart-box">
+                <canvas id="savings-impact"></canvas>
+            </div>
+        </div>
+
+        <div class="scenario-comparison" id="comparison-results"></div>
+    </div>
+
+    <script>
+        function formatMoney(amount) {
+            return amount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
+        }
+
+        function calculateFutureValue(monthlyInvestment, rate, years) {
+            let futureValue = 0;
+            for (let i = 0; i < years * 12; i++) {
+                futureValue = (futureValue + monthlyInvestment) * (1 + rate / 12);
+            }
+            return futureValue;
+        }
+
+        document.getElementById('scenario-inputs').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const income = parseFloat(document.getElementById('income').value);
+            const expenses = parseFloat(document.getElementById('expenses').value);
+            const assets = parseFloat(document.getElementById('assets').value);
+            const currentAge = parseInt(document.getElementById('age').value);
+            const targetRetirementAge = parseInt(document.getElementById('retirement-age').value);
+            const currentSavingsRate = parseFloat(document.getElementById('savings-rate').value) / 100;
+
+            // Generate scenarios
+            const scenarios = {
+                base: {
+                    name: 'Base Scenario',
+                    savingsRate: currentSavingsRate,
+                    retirementAge: targetRetirementAge,
+                    allocation: { stocks: 0.6, bonds: 0.3, cash: 0.1 },
+                    expectedReturn: 0.08
+                },
+                aggressive: {
+                    name: 'Aggressive Savings',
+                    savingsRate: currentSavingsRate + 0.1,
+                    retirementAge: targetRetirementAge,
+                    allocation: { stocks: 0.8, bonds: 0.15, cash: 0.05 },
+                    expectedReturn: 0.10
+                },
+                delayed: {
+                    name: 'Delayed Retirement',
+                    savingsRate: currentSavingsRate,
+                    retirementAge: targetRetirementAge + 5,
+                    allocation: { stocks: 0.6, bonds: 0.3, cash: 0.1 },
+                    expectedReturn: 0.08
+                },
+                conservative: {
+                    name: 'Conservative Approach',
+                    savingsRate: currentSavingsRate,
+                    retirementAge: targetRetirementAge,
+                    allocation: { stocks: 0.4, bonds: 0.5, cash: 0.1 },
+                    expectedReturn: 0.06
+                }
+            };
+
+            // Calculate outcomes for each scenario
+            const outcomes = {};
+            for (let [key, scenario] of Object.entries(scenarios)) {
+                const monthlyInvestment = income * scenario.savingsRate / 12;
+                const yearsToRetirement = scenario.retirementAge - currentAge;
+                outcomes[key] = {
+                    finalAmount: calculateFutureValue(monthlyInvestment, scenario.expectedReturn, yearsToRetirement),
+                    monthlyInvestment: monthlyInvestment,
+                    yearsToRetirement: yearsToRetirement,
+                    monthlyRetirementIncome: 0 // Will be calculated
+                };
+                outcomes[key].monthlyRetirementIncome = outcomes[key].finalAmount * 0.04 / 12; // 4% withdrawal rule
+            }
+
+            // Create comparison chart
+            new Chart(document.getElementById('retirement-comparison'), {
+                type: 'bar',
+                data: {
+                    labels: Object.values(scenarios).map(s => s.name),
+                    datasets: [{
+                        label: 'Retirement Savings',
+                        data: Object.values(outcomes).map(o => o.finalAmount),
+                        backgroundColor: '#21d952'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Total Retirement Savings by Scenario',
+                            color: '#21d952'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            ticks: { color: '#21d952' },
+                            grid: { color: '#333' }
+                        },
+                        x: {
+                            ticks: { color: '#21d952' },
+                            grid: { color: '#333' }
+                        }
+                    }
+                }
+            });
+
+            // Monthly Income Comparison
+            new Chart(document.getElementById('monthly-income'), {
+                type: 'bar',
+                data: {
+                    labels: Object.values(scenarios).map(s => s.name),
+                    datasets: [{
+                        label: 'Monthly Retirement Income',
+                        data: Object.values(outcomes).map(o => o.monthlyRetirementIncome),
+                        backgroundColor: '#1ab442'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Projected Monthly Retirement Income',
+                            color: '#21d952'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            ticks: { color: '#21d952' },
+                            grid: { color: '#333' }
+                        },
+                        x: {
+                            ticks: { color: '#21d952' },
+                            grid: { color: '#333' }
+                        }
+                    }
+                }
+            });
+
+            // Risk vs Return Chart
+            new Chart(document.getElementById('risk-return'), {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Risk vs Return Profile',
+                        data: Object.values(scenarios).map(s => ({
+                            x: s.allocation.stocks,
+                            y: s.expectedReturn * 100
+                        })),
+                        backgroundColor: '#21d952'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Risk vs Return Profile',
+                            color: '#21d952'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Expected Return (%)',
+                                color: '#21d952'
+                            },
+                            ticks: { color: '#21d952' },
+                            grid: { color: '#333' }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Stock Allocation (%)',
+                                color: '#21d952'
+                            },
+                            ticks: { color: '#21d952' },
+                            grid: { color: '#333' }
+                        }
+                    }
+                }
+            });
+
+            // Savings Impact Chart
+            new Chart(document.getElementById('savings-impact'), {
+                type: 'line',
+                data: {
+                    labels: Object.values(scenarios).map(s => s.name),
+                    datasets: [{
+                        label: 'Monthly Investment Required',
+                        data: Object.values(outcomes).map(o => o.monthlyInvestment),
+                        borderColor: '#21d952',
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Monthly Investment Requirements',
+                            color: '#21d952'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            ticks: { color: '#21d952' },
+                            grid: { color: '#333' }
+                        },
+                        x: {
+                            ticks: { color: '#21d952' },
+                            grid: { color: '#333' }
+                        }
+                    }
+                }
+            });
+
+            // Generate detailed comparison
+            let comparisonHTML = `
+                <h2>Detailed Scenario Comparison</h2>
+                <div class="comparison-grid">
+                ${Object.entries(scenarios).map(([key, scenario]) => `
+                    <div class="comparison-card">
+                        <div class="scenario-title">${scenario.name}</div>
+                        <div class="metric">
+                            <span>Final Amount:</span>
+                            <span>${formatMoney(outcomes[key].finalAmount)}</span>
+                        </div>
+                        <div class="metric">
+                            <span>Monthly Investment:</span>
+                            <span>${formatMoney(outcomes[key].monthlyInvestment)}</span>
+                        </div>
+                        <div class="metric">
+                            <span>Years to Retirement:</span>
+                            <span>${outcomes[key].yearsToRetirement}</span>
+                        </div>
+                        <div class="metric">
+                            <span>Monthly Retirement Income:</span>
+                            <span>${formatMoney(outcomes[key].monthlyRetirementIncome)}</span>
+                        </div>
+                        <div class="metric">
+                            <span>Stock Allocation:</span>
+                            <span>${scenario.allocation.stocks * 100}%</span>
+                        </div>
+                        <div class="metric">
+                            <span>Expected Return:</span>
+                            <span>${scenario.expectedReturn * 100}%</span>
+                        </div>
+                    </div>
+                `).join('')}
+                </div>
+            `;
+
+            document.getElementById('comparison-results').innerHTML = comparisonHTML;
+        });
+    </script>
+</body>
+</html>
